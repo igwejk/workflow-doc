@@ -1,0 +1,20 @@
+name: Test workflow
+
+# <!-- description -->
+# This is a test workflow.
+# This description has multiple lines.
+#
+# There can be multiple paragraphs in a description. A paragraph is started after an empty comment line.
+# And the description ends at the first line that is not a comment.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test: # The test job
+    runs-on: ubuntu-latest
+
+    steps:
+      # Execute an echo command
+      - name: Test
+        run: echo test
