@@ -7,8 +7,52 @@ name: Test workflow
 # There can be multiple paragraphs in a description. A paragraph is started after an empty comment line.
 # And the description ends at the first line that is not a comment.
 
-on:
-  workflow_dispatch: {}
+"on":
+  workflow_call:
+    inputs:
+      username:
+        description: "A username passed from the caller workflow"
+        default: "john-doe"
+        required: false
+        type: string
+    outputs:
+      workflow_output1:
+        description: "The first job output"
+        value: "fdlghjh"
+      workflow_output2:
+        description: "The second job output"
+        value: "dskjghfdfg"
+    secrets:
+      access-token:
+        description: "A token passed from the caller workflow"
+        required: false
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Log level"
+        required: true
+        default: "warning"
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+      print_tags:
+        description: "True to print to STDOUT"
+        required: true
+        type: boolean
+      tags:
+        description: "Test scenario tags"
+        required: true
+        type: string
+      environment:
+        description: "Environment to run tests against"
+        type: environment
+        required: true
+  workflow_run:
+    workflows: ["Upload data"]
+    types:
+      - completed
 
 jobs:
   test: # The test job
