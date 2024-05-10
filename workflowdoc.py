@@ -25,19 +25,42 @@ def read_workflow_description(workflow_file: TextIOWrapper) -> str:
     workflow_file.seek(0)
     workflow_lines = workflow_file.readlines()
 
-    description = None
+    workflow_description = None
     for line in workflow_lines:
-        if description is not None and line.startswith("#"):
-            description += f"\n{line.lstrip('#').strip()}"
+
+        if workflow_description is None:
+            if line.startswith("# <!-- description -->"):
+                workflow_description = ""
             continue
 
-        
-        if line.startswith("# <!-- description -->"):
-            description += line.lstrip("#").strip()
-        else:
-            break
+        if line.startswith("#"):
+            workflow_description += f"{line.lstrip('#').strip()}\n"
+            continue
 
-    return description
+        break
+
+    return workflow_description
+
+
+def analysed_workflow_inputs(workflow_inputs: dict) -> dict:
+    """
+    Analyse the inputs of the workflow and return the analysis results.
+    """
+    return {**workflow_inputs}
+
+
+def analysed_workflow_outputs(workflow_outputs: dict) -> dict:
+    """
+    Analyse the outputs of the workflow and return the analysis results.
+    """
+    return {**workflow_outputs}
+
+
+def analysed_workflow_secrets(workflow_secrets: dict) -> dict:
+    """
+    Analyse the outputs of the workflow and return the analysis results.
+    """
+    return {**workflow_secrets}
 
 
 def analyse_workflow(workflow_path: str) -> dict:
@@ -46,11 +69,50 @@ def analyse_workflow(workflow_path: str) -> dict:
     """
 
     with open(workflow_path, mode="r", encoding="utf-8") as workflow_file:
-
-        workflow = yaml.safe_load(workflow_file)
+        workflow = yaml.safe_load(stream=workflow_file)
         workflow_description = read_workflow_description(workflow_file=workflow_file)
 
-    return {}
+    analysed_workflow = {"workflow_description": workflow_description}
+
+    if "workflow_call" in workflow["on"]:
+        analysed_workflow.update(
+            {
+                "is_reusable": True,
+                "inputs": analysed_workflow_inputs(
+                    workflow_inputs=workflow["on"]["workflow_call"].get("inputs", None)
+                ),
+                "outputs": analysed_workflow_outputs(
+                    workflow_outputs=workflow["on"]["workflow_call"].get(
+                        "outputs", None
+                    )
+                ),
+                "secrets": analysed_workflow_secrets(
+                    workflow_secrets=workflow["on"]["workflow_call"].get(
+                        "secrets", None
+                    )
+                ),
+            }
+        )
+
+    if "workflow_dispatch" in workflow["on"]:
+        analysed_workflow.update(
+            {
+                "is_triggered_manually": True,
+                "inputs": analysed_workflow_inputs(
+                    workflow_inputs=workflow["on"]["workflow_dispatch"].get(
+                        "inputs", None
+                    )
+                ),
+            }
+        )
+
+    if "workflow_run" in workflow["on"]:
+        analysed_workflow.update(
+            {
+                "is_triggered_by_execution_of_another_workflow": True,
+                "triggered_by_execution_of_workflow": workflow["on"]["workflow_run"],
+            }
+        )
 
 
 def generate_markdown(analysed_workflow: dict) -> str:
