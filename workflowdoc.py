@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Generate markdown documentation for a given GitHub Actions workflow. 
+Generate markdown documentation for a given GitHub Actions workflow.
 
 It includes the following functions:
 
@@ -14,12 +14,26 @@ It includes the following functions:
   Generates a markdown documentation for the workflow file at the specified path.
 """
 
+import re
+from io import TextIOWrapper
 from os import path
-from pathlib import Path
 from typing import Generator
 
 import typer
 import yaml
+
+YAML_RESERVED_TRUE = r"true|True|TRUE"
+YAML_RESERVED_FALSE = r"false|False|FALSE"
+YAML_RESERVED_NULL = r"null|Null|NULL"
+YAML_RESERVED_YES = r"yes|Yes|YES"
+YAML_RESERVED_NO = r"no|No|NO"
+YAML_RESERVED_ON = r"on|On|ON"
+YAML_RESERVED_OFF = r"off|Off|OFF"
+
+YAML_RESERVED_WORDS = re.compile(
+    rf"(^\s*)({YAML_RESERVED_TRUE}|{YAML_RESERVED_FALSE}|{YAML_RESERVED_NULL}"
+    rf"|{YAML_RESERVED_YES}|{YAML_RESERVED_NO}|{YAML_RESERVED_ON}|{YAML_RESERVED_OFF}):"
+)
 
 
 def workflowdoc() -> None:
@@ -30,30 +44,6 @@ def workflowdoc() -> None:
 
 
 app = typer.Typer(callback=workflowdoc, name="workflowdoc")
-
-
-def read_workflow_description(workflow_file_content: str) -> str:
-    """
-    Read the description of the workflow from the workflow file.
-    """
-
-    workflow_lines = workflow_file_content.split("\n")
-
-    workflow_description = None
-    for line in workflow_lines:
-
-        if workflow_description is None:
-            if line.startswith("# <!-- description -->"):
-                workflow_description = ""
-            continue
-
-        if line.startswith("#"):
-            workflow_description += f"{line.lstrip('#').strip()}\n"
-            continue
-
-        break
-
-    return workflow_description
 
 
 def render_workflow_dispatch_input_type_md_table_cell(input_details: dict) -> str:
@@ -73,17 +63,36 @@ def render_workflow_dispatch_input_type_md_table_cell(input_details: dict) -> st
     return f"`{input_type}`"
 
 
-def generate_markdown(workflow_path: str) -> Generator[str, None, None]:
+def generate_markdown_from_workflow(
+    workflow_lines: Generator[str, None, None]
+) -> Generator[str, None, None]:
     """
     Generate a markdown documentation for the analysed workflow.
     """
 
-    workflow_file_content = Path(workflow_path).read_text(encoding="utf-8")
+    workflow_file_content = ""
+    workflow_description = None
+
+    # While reading the workflow description, collect the workflow content.
+    for line in workflow_lines:
+        workflow_file_content += line
+
+        if workflow_description is None:
+            if line.startswith("# <!-- description -->"):
+                workflow_description = ""
+            continue
+        if line.startswith("#"):
+            workflow_description += f"{line.lstrip('#').strip()}\n"
+            continue
+        break
+
+    # Read the "rest" of the workflow content.
+    workflow_file_content += "\n".join(workflow_lines)
     workflow = yaml.safe_load(workflow_file_content)
 
     yield f"# {workflow['name']}"
     yield "\n"
-    yield read_workflow_description(workflow_file_content=workflow_file_content)
+    yield workflow_description
     yield "\n"
 
     yield "## Triggers"
@@ -195,6 +204,17 @@ def generate_markdown(workflow_path: str) -> Generator[str, None, None]:
         yield "\n"
 
 
+def generate_normalised_yaml(yaml_file: TextIOWrapper) -> Generator[str, None, None]:
+    """
+    Generate lines of normalised YAML file content.
+    """
+
+    yaml_file.seek(0)
+
+    for line in yaml_file:
+        yield YAML_RESERVED_WORDS.sub(r'\1"\2":', line)
+
+
 @app.command(name="generate")
 def generate(
     workflow_path: str = typer.Argument(
@@ -210,11 +230,13 @@ def generate(
         path.dirname(workflow_path), f"{path.basename(workflow_path)}.md"
     )
 
-    with open(
+    with open(file=workflow_path, mode="rt", encoding="utf-8") as workflow_file, open(
         mode="wt", file=generated_output_path, encoding="utf-8"
     ) as generated_doc_file:
 
-        for line in generate_markdown(workflow_path=workflow_path):
+        for line in generate_markdown_from_workflow(
+            workflow_lines=generate_normalised_yaml(yaml_file=workflow_file)
+        ):
             print(line, file=generated_doc_file)
 
         generated_doc_file.flush()
