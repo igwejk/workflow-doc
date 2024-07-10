@@ -1,19 +1,24 @@
 name: Test workflow
 
 # <!-- description -->
-# This is a test workflow.
+# This is a test workflow. And it is the best workflow.
 # This description has multiple lines.
 #
 # There can be multiple paragraphs in a description. A paragraph is started after an empty comment line.
 # And the description ends at the first line that is not a comment.
 
-"on":
+on:
   workflow_call:
     inputs:
+      yes:
+        description: "yes, what you gonna do bool?"
+        default: "john-doe"
+        required: false
+        type: string
       username:
         description: "A username passed from the caller workflow"
         default: "john-doe"
-        required: false
+        required: true
         type: string
     outputs:
       workflow_output1:
@@ -22,10 +27,16 @@ name: Test workflow
       workflow_output2:
         description: "The second job output"
         value: "dskjghfdfg"
+      no:
+        description: "no, what you gonna do bool?"
+        value: "fkhjgkrf"
     secrets:
       access-token:
         description: "A token passed from the caller workflow"
         required: false
+      ten-ounce-id:
+        description: "An ounce of tenance to tell who is who"
+        required: true
   workflow_dispatch:
     inputs:
       logLevel:
@@ -43,7 +54,7 @@ name: Test workflow
         type: boolean
       tags:
         description: "Test scenario tags"
-        required: true
+        required: false
         type: string
       environment:
         description: "Environment to run tests against"

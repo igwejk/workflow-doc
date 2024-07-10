@@ -225,10 +225,12 @@ def generate(
     Generate a markdown documentation for the workflow file at the specified path.
     """
 
-    print(f"Generating markdown documentation for workflow {workflow_path} ...")
+    print(f"Processing workflow {workflow_path} ...\n.\n.\n.\n")
+
     generated_output_path = path.join(
         path.dirname(workflow_path), f"{path.basename(workflow_path)}.md"
     )
+    print(f"Generating documentation at {generated_output_path} ...\n.\n.\n.\n")
 
     with open(file=workflow_path, mode="rt", encoding="utf-8") as workflow_file, open(
         mode="wt", file=generated_output_path, encoding="utf-8"
