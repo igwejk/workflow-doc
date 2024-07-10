@@ -20,45 +20,44 @@ jobs:
           app-id: ${{ vars.APP_ID_WORKFLOW_DOC_CONTINUOUS_DELIVERY }}
           private-key: ${{ secrets.APP_KEY_WORKFLOW_DOC_CONTINUOUS_DELIVERY }}
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ steps.generate-app-token.outputs.token }}
 
-      - name: Get last version number
-        id: get_last_version
+      - name: Compute latest version
+        id: get_latest_version
         run: |
-          # Retrieve the last git tag, as we will only be processing one delivery line.
-          last_version=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
-          echo "Last version is $last_version"
-          echo "last_version=$last_version" >> "$GITHUB_OUTPUT"
+          # Retrieve the latest git tag, as we will only be processing one delivery line.
+          latest_version=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest version is $latest_version"
+          echo "latest_version=$latest_version" >> "$GITHUB_OUTPUT"
 
-      - name: Get new version number
-        id: get_new_version
+      - name: Compute next version
+        id: get_next_version
         run: |
-          major=$(echo $last_version | cut -d. -f1)
-          minor=$(echo $last_version | cut -d. -f2)
-          patch=$(echo $last_version | cut -d. -f3)
+          major=$(echo $latest_version | cut --delimiter=. --fields=1)
+          minor=$(echo $latest_version | cut --delimiter=. --fields=2)
+          patch=$(echo $latest_version | cut --delimiter=. --fields=3)
 
-          new_patch=$((patch+1))
+          next_patch=$((patch+1))
 
-          new_version="$major.$minor.$new_patch"
+          next_version="$major.$minor.$next_patch"
 
-          echo "New version is $new_version"
-          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+          echo "Next version is $next_version"
+          echo "next_version=$next_version" >> "$GITHUB_OUTPUT"
         env:
-          last_version: ${{ steps.get_last_version.outputs.last_version }}
+          latest_version: ${{ steps.get_latest_version.outputs.latest_version }}
 
-      - name: Create tag for the new version
+      - name: Create reproducible tag
         run: |
-          git config --global user.name "${GITHUB_ACTOR}"
-          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git config user.name "workflow-doc-continuous-delivery[bot]"
+          git config user.email "workflow-doc-continuous-delivery[bot]@users.noreply.github.com"
 
-          if git tag -a "$new_version" -m "Version $new_version"; then
-            git push --follow-tags origin "$new_version"
+          if git tag -a "$next_version" -m "$next_version"; then
+            git push --follow-tags origin "$next_version"
           else
-            echo "Failed to create tag $new_version, it probably already exists"
+            echo "Failed to create tag $next_version, it probably already exists"
           fi
         env:
-          new_version: ${{ steps.get_new_version.outputs.new_version }}-release
+          next_version: "${{ steps.get_next_version.outputs.next_version }}"

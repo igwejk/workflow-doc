@@ -1,0 +1,74 @@
+name: Package delivery artifacts & create release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  package-delivery:
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/create-github-app-token@v1
+        id: generate-app-token
+        with:
+          app-id: ${{ vars.APP_ID_WORKFLOW_DOC_CONTINUOUS_DELIVERY }}
+          private-key: ${{ secrets.APP_KEY_WORKFLOW_DOC_CONTINUOUS_DELIVERY }}
+
+      - uses: actions/github-script@v7
+        id: draft-release
+        with:
+          github-token: ${{ steps.generate-app-token.outputs.token }}
+          script: |
+
+            const response = await github.request(
+              'POST /repos/{owner}/{repo}/releases',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                draft: true,
+                tag_name: '${{ github.ref }}',
+                discussion_category_name: 'announcements',
+                generate_release_notes: true,
+                make_latest: 'legacy',
+                headers: {
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+
+            console.dir(response);
+
+            return response.data.id;
+
+      - name: Publish release
+        uses: actions/github-script@v7
+        id: publish-release
+        with:
+          github-token: ${{ steps.generate-app-token.outputs.token }}
+          script: |
+
+            const response = await github.request(
+              'PATCH /repos/{owner}/{repo}/releases/{release_id}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: ${{ steps.draft-release.outputs.result }},
+                draft: false,
+                discussion_category_name: 'announcements',
+                make_latest: 'true',
+                headers: {
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+
+            console.dir(response);
