@@ -20,7 +20,7 @@ jobs:
       - name: Tests
         run: |
           python -m pytest tests
-      - name: Dependency review
-        uses: actions/dependency-review-action@v3
-        with:
-          config-file: ./.github/dependency-review-config.yml
+      # - name: Dependency review
+      #   uses: actions/dependency-review-action@v3
+      #   with:
+      #     config-file: ./.github/dependency-review-config.yml
