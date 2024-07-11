@@ -18,7 +18,7 @@ main() {
 
     echo "Running ./workflowdoc.py in container..."
     echo
-    docker run --rm --env-file "${SCRIPT_DIR}/.env" workflowdoc "$@"
+    docker run --rm --volume "$(pwd):/workspace" workflowdoc "$@"
 }
 
 (
