@@ -17,6 +17,7 @@ It includes the following functions:
 import re
 from io import TextIOWrapper
 from os import path
+from pathlib import Path
 from typing import Generator
 
 import typer
@@ -217,8 +218,8 @@ def generate_normalised_yaml(yaml_file: TextIOWrapper) -> Generator[str, None, N
 
 @app.command(name="generate")
 def generate(
-    workflow_path: str = typer.Argument(
-        ..., help="The workflow to analyse and document."
+    workflow_path: Path = typer.Argument(
+        ..., help="Path to the workflow to analyse and document."
     )
 ) -> None:
     """
