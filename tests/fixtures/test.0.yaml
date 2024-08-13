@@ -66,10 +66,44 @@ on:
       - completed
 
 jobs:
-  test: # The test job
+  first:
     runs-on: ubuntu-latest
 
     steps:
       # Execute an echo command
       - name: Test
+        run: |
+          echo something in first job's first step
+  second:
+    runs-on: ubuntu-latest
+    needs: first
+    name: the second of it's type
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        name: Run javascripts
+        with:
+          script: |
+            console.log("boo!")
+  third:
+    runs-on: ubuntu-latest
+    needs: [first, second]
+    steps:
+      - name: Test
         run: echo test
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        name: Log boo!
+        with:
+          script: |
+            console.log("boo!")
+  fourth:
+    uses: demos-by-igwejk/reusable-workflows/.github/workflows/reusable.yml@main
+    with:
+      boo: "hoo"
+      environment: "protection"
+    secrets:
+      envJson: "secret-1"
+      envSecret: "secret-2"
+      envVar: "secret-3"
+      sekuret: "secret-4"

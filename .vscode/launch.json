@@ -11,7 +11,7 @@
             "module": "workflowdoc",
             "args": [
                 "generate",
-                "${workspaceFolder}/.github/workflows/best.yaml"
+                "${workspaceFolder}/tests/fixtures/test.0.yaml"
             ],
         }
     ]
