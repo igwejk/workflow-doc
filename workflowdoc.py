@@ -63,6 +63,111 @@ def render_workflow_dispatch_input_type_md_table_cell(input_details: dict) -> st
     return f"`{input_type}`"
 
 
+def render_mermaid_diagram(workflow: dict) -> list:
+    """
+    Generate a Mermaid diagram for the GitHub Actions workflow.
+    """
+
+    def get_job_entry_name(job_id, job):
+        return job.get("name", word_separator.sub(" ", job_id))
+
+    def get_state_diagram_content_for_job_labels(
+        jobs_sorted_by_least_needs, indentation=4
+    ):
+        return [
+            f"{' ' * indentation}{job_id}: {get_job_entry_name(job_id, job)}"
+            for job_id, job in jobs_sorted_by_least_needs
+        ]
+
+    def get_state_diagram_content_for_job_steps(job, job_id, indentation=12):
+
+        if "uses" in job:
+            return [f"{' ' * indentation}Calls&nbsp;reusable&nbsp;workflow"]
+
+        def get_step_label(step, job_id):
+
+            prefix = job_id
+
+            if "name" in step:
+                step_label = step["name"].replace(" ", "&nbsp;")
+            elif "uses" in step:
+                step_label = step["uses"]
+            elif "run" in step:
+                step_label = step["run"][:10].replace("\n", "&nbsp;")
+            else:
+                step_label = step["id"]
+
+            return f"{prefix}>>{step_label}"
+
+        step_labels = [get_step_label(step, job_id) for step in job.get("steps", [])]
+        step_transitions = []
+
+        for index, step_label in enumerate(step_labels[1:], start=1):
+            previous_step_label = step_labels[index - 1]
+            step_transitions.append(
+                f"{' ' * indentation}{previous_step_label} --> {step_label}"
+            )
+
+        return step_transitions or [f"{' ' * indentation}{step_labels[0]}"]
+
+    def get_state_diagram_content_for_needs(job_id, job, indentation=8):
+        if "needs" not in job:
+            return []
+
+        needed_job_ids = job["needs"]
+        if isinstance(needed_job_ids, str):
+            needed_job_ids = [needed_job_ids]
+
+        return [
+            f"{' ' * indentation}{needed_job_id} --> {job_id}"
+            for needed_job_id in needed_job_ids
+        ]
+
+    def get_state_diagram_content_for_jobs(jobs_sorted_by_least_needs, indentation=8):
+
+        state_diagram_content_for_jobs = [
+            line
+            for job_id, job in jobs_sorted_by_least_needs
+            for line in [
+                f"{' ' * indentation}[*] --> {job_id}",
+                f"{' ' * indentation}state {job_id} {{",
+                f"{' ' * (indentation+4)}direction TB",
+                *get_state_diagram_content_for_job_steps(
+                    job, job_id, indentation=indentation + 4
+                ),
+                f"{' ' * indentation}}}\n",
+                *get_state_diagram_content_for_needs(
+                    job_id, job, indentation=indentation
+                ),
+                f"\n{' ' * indentation}--",
+            ]
+        ]
+
+        return (
+            state_diagram_content_for_jobs[:-1]
+            if "--" in state_diagram_content_for_jobs[-1]
+            else state_diagram_content_for_jobs
+        )
+
+    word_separator = re.compile(r"[_-]")
+    jobs_sorted_by_needs = sorted(
+        workflow["jobs"].items(), key=lambda x: len(x[1].get("needs", []))
+    )
+
+    diagram = [
+        "```mermaid",
+        "\nstateDiagram-v2\n",
+        *get_state_diagram_content_for_job_labels(jobs_sorted_by_needs, indentation=4),
+        f"\n{' ' * 4}[*] --> Triggers",
+        f"{' ' * 4}state Triggers {{\n",
+        *get_state_diagram_content_for_jobs(jobs_sorted_by_needs, indentation=8),
+        f"\n{' ' * 4}}}",
+        "```",
+    ]
+
+    return diagram
+
+
 def generate_markdown_from_workflow(
     workflow_lines: Generator[str, None, None]
 ) -> Generator[str, None, None]:
@@ -84,6 +189,8 @@ def generate_markdown_from_workflow(
         if line.startswith("#"):
             workflow_description += f"{line.lstrip('#').strip()}\n"
             continue
+
+        workflow_description = workflow_description.rstrip("\n")
         break
 
     # Read the "rest" of the workflow content.
@@ -91,21 +198,18 @@ def generate_markdown_from_workflow(
     workflow = yaml.safe_load(workflow_file_content)
 
     yield f"# {workflow['name']}"
-    yield "\n"
-    yield workflow_description
-    yield "\n"
+    yield f"\n{workflow_description}"
 
-    yield "## Triggers"
-    yield "\n"
+    yield "\n## Workflow Diagram\n"
+    yield from render_mermaid_diagram(workflow)
 
+    yield "\n## Triggers"
     if "workflow_call" in workflow["on"]:
-        yield "### `workflow_call`"
-        yield "\n"
-        yield "This workflow is reusable."
-        yield "\n"
+        yield "\n### `workflow_call`"
+        yield "\nThis workflow is reusable."
 
         if workflow["on"]["workflow_call"].get("inputs", None):
-            yield "#### Inputs"
+            yield "\n#### `workflow_call.inputs`\n"
             yield "| Name | Description | Default | Required | Type |"
             yield "| :--- | :---------- | :------ | :------: | :--- |"
 
@@ -121,7 +225,7 @@ def generate_markdown_from_workflow(
                 )
 
         if workflow["on"]["workflow_call"].get("secrets", None):
-            yield "#### Secrets"
+            yield "\n#### Secrets\n"
             yield "| Name | Description | Required |"
             yield "| :--- | :---------- | :------: |"
 
@@ -135,7 +239,7 @@ def generate_markdown_from_workflow(
                 )
 
         if workflow["on"]["workflow_call"].get("outputs", None):
-            yield "#### Outputs"
+            yield "\n#### Outputs\n"
             yield "| Name | Description |"
             yield "| :--- | :---------- |"
 
@@ -147,13 +251,11 @@ def generate_markdown_from_workflow(
                 )
 
     if "workflow_dispatch" in workflow["on"]:
-        yield "### `workflow_dispatch`"
-        yield "\n"
-        yield "This workflow can be manually triggered."
-        yield "\n"
+        yield "\n### `workflow_dispatch`"
+        yield "\nThis workflow can be manually triggered."
 
         if workflow["on"]["workflow_dispatch"].get("inputs", None):
-            yield "#### Inputs"
+            yield "\n#### `workflow_dispatch.inputs`\n"
             yield "| Name | Description | Default | Required | Type |"
             yield "| :--- | :---------- | :------ | :------: | :--- |"
 
@@ -172,36 +274,29 @@ def generate_markdown_from_workflow(
                 )
 
     if "workflow_run" in workflow["on"]:
-        yield "### `workflow_run`"
-        yield "\n"
-        yield "This workflow is triggered by the execution of other workflows."
-        yield "\n"
+        yield "\n### `workflow_run`"
+        yield "\nThis workflow is triggered by the execution of other workflows."
 
-        yield "#### Triggering workflows:"
-        yield "\n"
-        for workflow_name in workflow["on"]["workflow_run"]["workflows"]:
-            yield f"- {workflow_name}"
-        yield "\n"
+        yield "\n#### `workflow_run.workflows`\n"
+        yield from [
+            f"- {workflow_name}"
+            for workflow_name in workflow["on"]["workflow_run"]["workflows"]
+        ]
 
         branches = workflow["on"]["workflow_run"].get("branches", None) or workflow[
             "on"
         ]["workflow_run"].get("branches-ignore", None)
         if branches:
             yield (
-                "#### Workflow branches:"
+                "\n#### `workflow_run.branches`\n"
                 if workflow["on"]["workflow_run"].get("branches", None)
-                else "#### `Skipped` workflow branches:"
+                else "\n#### `workflow_run.branches-ignore`\n"
             )
-            yield "\n"
-            for branch in branches:
-                yield f"- {branch}"
-            yield "\n"
+            yield from [f"- {branch}" for branch in branches]
 
-        yield "#### Workflow activity types:"
+        yield "\n#### `workflow_run.types`\n"
         activity_types = workflow["on"]["workflow_run"].get("types")
-        for activity_type in activity_types:
-            yield f"- {activity_type}"
-        yield "\n"
+        yield from [f"- {activity_type}" for activity_type in activity_types]
 
 
 def generate_normalised_yaml(yaml_file: TextIOWrapper) -> Generator[str, None, None]:
@@ -232,9 +327,12 @@ def generate(
     )
     print(f"Generating documentation at {generated_output_path} ...\n.\n.\n.\n")
 
-    with open(file=workflow_path, mode="rt", encoding="utf-8") as workflow_file, open(
-        mode="wt", file=generated_output_path, encoding="utf-8"
-    ) as generated_doc_file:
+    with (
+        open(file=workflow_path, mode="rt", encoding="utf-8") as workflow_file,
+        open(
+            mode="wt", file=generated_output_path, encoding="utf-8"
+        ) as generated_doc_file,
+    ):
 
         for line in generate_markdown_from_workflow(
             workflow_lines=generate_normalised_yaml(yaml_file=workflow_file)
