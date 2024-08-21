@@ -40,12 +40,26 @@ jobs:
           minor=$(echo $latest_version | cut --delimiter=. --fields=2)
           patch=$(echo $latest_version | cut --delimiter=. --fields=3)
 
-          next_patch=$((patch+1))
+          is_new_major_version="false"
 
-          next_version="$major.$minor.$next_patch"
+          change_type=$(git log -1 --pretty=%B | grep -oP '(?<=change-type:\s)\w+')
+          if [ "$change_type" == "backward-compatible fixes" ]; then
+            patch=$((patch+1))
+          elif [ "$change_type" == "backward-compatible features" ]; then
+            minor=$((minor+1))
+          elif [ "$change_type" == "backward-incompatible" ]; then
+            major_number=$(echo "$major" | cut --delimiter=v --fields=2)
+            major="v$((major_number+1))"
+            is_new_major_version="true"
+            minor="0"
+            patch="0"
+          fi
 
+          next_version="$major.$minor.$patch"
           echo "Next version is $next_version"
+
           echo "next_version=$next_version" >> "$GITHUB_OUTPUT"
+          echo "is_new_major_version=$is_new_major_version" >> "$GITHUB_OUTPUT"
         env:
           latest_version: ${{ steps.get_latest_version.outputs.latest_version }}
 
@@ -59,5 +73,11 @@ jobs:
           else
             echo "Failed to create tag $next_version, it probably already exists"
           fi
+
+          if [ "$is_new_major_version" == "true"]; then
+            major=$(echo $next_version | cut --delimiter=. --fields=1)
+            git tag -a "$major" -m "$major" && git push --follow-tags origin "$major"
+          fi
         env:
           next_version: "${{ steps.get_next_version.outputs.next_version }}"
+          is_new_major_version: "${{ steps.get_next_version.outputs.is_new_major_version }}"

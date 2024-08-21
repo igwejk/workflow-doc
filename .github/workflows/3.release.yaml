@@ -3,7 +3,8 @@ name: Package delivery artifacts & create release
 on:
   push:
     tags:
-      - "*"
+      - "v*"
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -16,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - uses: actions/create-github-app-token@v1
         id: generate-app-token
         with:
