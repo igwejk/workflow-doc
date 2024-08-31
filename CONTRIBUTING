@@ -1,0 +1,18 @@
+# Contributing
+
+Please keep the [issue tracker](https://github.com/igwejk/workflow-doc/issues) limited to **bug reports** and **improvements**.
+
+## General Questions and Support
+
+If you have questions about how to use `workflow-doc` the best place to ask is in the [Discussions](https://github.com/igwejk/workflow-doc/discussions). Anything that isn't a bug report should be posted as a discussion instead.
+
+## Pull Requests
+
+- Should be submitted from a feature/topic branch (not your `main`)
+- The `HEAD` commit must include a `change-type` line which addresses expectation of backward compatibility in the change.
+
+  When a pull request is merged, the specified `change-type` will influence versioning and release as follows.
+
+  - `change-type: backward-compatible fixes` will cause a patch increment
+  - `change-type: backward-compatible features` will cause a minor increment
+  - `change-type: backward-incompatible` will cause a major version increment

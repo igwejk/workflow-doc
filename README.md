@@ -38,10 +38,10 @@ Execute **`./workflowdoc.py generate /path/to/workflow.yaml`** to generate docum
 
 #### Executing `workflowdoc.py` in a container
 
-If you have `Docker` available you may instead simplify the prerequisite setup by executing **`./workflowdoc.sh --help`**.
+If you have `Docker` available, you may choose to use **`./workflowdoc.sh --help`** which will automatically address prerequisite requirements for you before executing the CLI.
 
 > [!IMPORTANT]
-> Provide a **relative** path as argument to the script when using a container environment for execution.
+> When using the `./workflowdoc.sh` script, provide a **relative** path as argument to the script.
 
 ### GitHub Action wrapper
 

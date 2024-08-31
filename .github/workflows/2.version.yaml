@@ -30,7 +30,9 @@ jobs:
         run: |
           # Retrieve the latest git tag, as we will only be processing one delivery line.
           latest_version=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+
           echo "Latest version is $latest_version"
+
           echo "latest_version=$latest_version" >> "$GITHUB_OUTPUT"
 
       - name: Compute next version
@@ -40,17 +42,18 @@ jobs:
           minor=$(echo $latest_version | cut --delimiter=. --fields=2)
           patch=$(echo $latest_version | cut --delimiter=. --fields=3)
 
-          is_new_major_version="false"
+          change_type=$(git log -1 --pretty=%B | grep -oP '(?<=change-type:\s).+' | xargs)
+          echo "Change type is: $change_type"
 
-          change_type=$(git log -1 --pretty=%B | grep -oP '(?<=change-type:\s)\w+')
           if [ "$change_type" == "backward-compatible fixes" ]; then
             patch=$((patch+1))
           elif [ "$change_type" == "backward-compatible features" ]; then
             minor=$((minor+1))
+            patch="0"
           elif [ "$change_type" == "backward-incompatible" ]; then
             major_number=$(echo "$major" | cut --delimiter=v --fields=2)
+
             major="v$((major_number+1))"
-            is_new_major_version="true"
             minor="0"
             patch="0"
           fi
@@ -58,26 +61,34 @@ jobs:
           next_version="$major.$minor.$patch"
           echo "Next version is $next_version"
 
+          echo "next_version_major=$major" >> "$GITHUB_OUTPUT"
+          echo "next_version_minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "next_version_patch=$patch" >> "$GITHUB_OUTPUT"
           echo "next_version=$next_version" >> "$GITHUB_OUTPUT"
-          echo "is_new_major_version=$is_new_major_version" >> "$GITHUB_OUTPUT"
         env:
           latest_version: ${{ steps.get_latest_version.outputs.latest_version }}
 
-      - name: Create reproducible tag
+      - name: Configure git user
         run: |
           git config user.name "workflow-doc-continuous-delivery[bot]"
           git config user.email "workflow-doc-continuous-delivery[bot]@users.noreply.github.com"
 
+      - name: Create reproducible tag
+        run: |
           if git tag -a "$next_version" -m "$next_version"; then
             git push --follow-tags origin "$next_version"
           else
-            echo "Failed to create tag $next_version, it probably already exists"
-          fi
-
-          if [ "$is_new_major_version" == "true"]; then
-            major=$(echo $next_version | cut --delimiter=. --fields=1)
-            git tag -a "$major" -m "$major" && git push --follow-tags origin "$major"
+            echo "Failed to create tag $next_version, does it already exist?"
           fi
         env:
           next_version: "${{ steps.get_next_version.outputs.next_version }}"
-          is_new_major_version: "${{ steps.get_next_version.outputs.is_new_major_version }}"
+
+      - name: Save major version tag
+        run: |
+          if git tag --force a "$next_version_major" -m "Update $next_version_major tag"; then
+            git push origin "$next_version_major" --force
+          else
+            echo "Failed to save updated major tag $next_version_major, does it already exist"
+          fi
+        env:
+          next_version_major: "${{ steps.get_next_version.outputs.next_version_major }}"
