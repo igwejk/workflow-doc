@@ -9,7 +9,42 @@ jobs:
   run-checks:
     runs-on: ubuntu-latest
     steps:
+      - run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Validate `HEAD` commit message
+        run: |
+          git log --graph --decorate --all --max-count=3
+
+          commit_message=$(git log -1 --pretty=%B)
+
+          change_type_entries=("backward-compatible fixes" "backward-compatible features" "backward-incompatible")
+
+          change_type=$(git log -1 --pretty=%B | grep -oP '(?<=^change-type:\s).+' | xargs)
+
+          if [[ -z "$change_type" ]]; then
+              echo "No change-type entry found in commit message. Commit message is invalid. It must contain a line with one of the following entries:"
+              for valid_change_type_entry in "${change_type_entries[@]}"; do
+                  echo "- change-type: $valid_change_type_entry"
+              done
+              exit 1
+          fi
+
+          for valid_change_type_entry in "${change_type_entries[@]}"; do
+              if [[ "$change_type" == "$valid_change_type_entry" ]]; then
+                  echo "Found '${change_type}' change-type in commit message. Commit message is valid."
+                  exit 0
+              fi
+          done
+
+          echo "Found unsupported change type specification '${change_type}' in commit message. Commit message is invalid. It must contain a line with one of the following entries:"
+          for valid_change_type_entry in "${change_type_entries[@]}"; do
+              echo "- change-type: $valid_change_type_entry"
+          done
+          exit 1
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
