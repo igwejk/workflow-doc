@@ -85,8 +85,8 @@ jobs:
 
       - name: Save major version tag
         run: |
-          if git tag --force a "$next_version_major" -m "Update $next_version_major tag"; then
-            git push origin "$next_version_major" --force
+          if git tag --force -a "$next_version_major" -m "Update $next_version_major tag"; then
+            git push --follow-tags origin "$next_version_major" --force
           else
             echo "Failed to save updated major tag $next_version_major, does it already exist"
           fi
